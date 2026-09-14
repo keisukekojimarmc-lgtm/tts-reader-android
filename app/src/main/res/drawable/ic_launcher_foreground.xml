@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- スピーカー -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M30,44h10l12,-10v40l-12,-10h-10z" />
+    <!-- 音波 -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M60,44a10,10 0 0 1 0,20" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M66,36a20,20 0 0 1 0,36" />
+    <!-- 本文行を表す短いライン -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M30,80h48" />
+</vector>

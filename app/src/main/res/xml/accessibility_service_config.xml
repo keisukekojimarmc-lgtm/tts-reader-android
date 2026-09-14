@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  スクロール完了の検知に typeViewScrolled、画面更新の検知に typeWindowContentChanged を購読する。
+  canRetrieveWindowContent が無いと rootInActiveWindow が取得できない。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeViewScrolled|typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackSpoken"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.example.ttsreader.MainActivity"
+    android:summary="@string/accessibility_service_summary" />
