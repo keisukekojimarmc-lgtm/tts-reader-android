@@ -12,3 +12,5 @@
 *.aab
 *.keystore
 !gradle/wrapper/gradle-wrapper.jar
+/minutes/build/
+!minutes/debug.keystore

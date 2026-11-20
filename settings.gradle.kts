@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "TtsReader"
 include(":app")
+include(":minutes")
