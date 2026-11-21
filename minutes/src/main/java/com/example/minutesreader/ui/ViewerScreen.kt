@@ -116,7 +116,7 @@ fun ViewerScreen(vm: AppViewModel, id: String) {
                                         val o = JSONObject(JSONTokener(result).nextValue() as String)
                                         val arr = o.getJSONArray("b")
                                         val blocks = (0 until arr.length()).map { arr.getString(it) }
-                                        vm.startReading(blocks, o.optInt("f", 0))
+                                        vm.startReading(blocks, o.optInt("f", 0), minute?.title.orEmpty())
                                     }
                                 }
                             }) { Icon(PlayerIcons.Headphones, "読み上げ") }

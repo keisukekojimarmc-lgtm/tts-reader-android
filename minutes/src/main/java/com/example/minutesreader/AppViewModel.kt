@@ -46,7 +46,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val auth = AuthStore(app)
     private val client = DropboxClient(auth)
     val repo = MinutesRepository(app, client)
-    val speaker = Speaker(app)
+    val speaker = Speaker.get(app)
 
     private val _stack = MutableStateFlow<kotlin.collections.List<Screen>>(
         listOf(if (auth.isLoggedIn) Screen.List else Screen.Setup),
@@ -163,10 +163,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- 読み上げ ----
 
     /** 本文の段落リストを受け取り、firstBlock 番目の段落から読み上げを始める。 */
-    fun startReading(blocks: kotlin.collections.List<String>, firstBlock: Int) {
+    fun startReading(blocks: kotlin.collections.List<String>, firstBlock: Int, title: String) {
         val items = SpeechText.items(blocks)
         val start = items.indexOfFirst { it.block >= firstBlock }.coerceAtLeast(0)
-        speaker.load(items, start, prefs.speechRate.value)
+        speaker.load(items, start, prefs.speechRate.value, title)
     }
 
     /** 本文の段落がタップされたとき（読み上げ中ならそこへ移動）。 */
@@ -181,6 +181,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        speaker.shutdown()
+        // アプリを終了したら読み上げも終える
+        speaker.close()
     }
 }

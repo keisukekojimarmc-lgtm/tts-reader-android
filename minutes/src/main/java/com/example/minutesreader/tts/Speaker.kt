@@ -1,6 +1,8 @@
 package com.example.minutesreader.tts
 
 import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,13 +18,14 @@ data class PlayerState(
     val total: Int = 0,
     val block: Int = -1,
     val rate: Float = 1f,
+    val title: String = "",
 )
 
 /**
  * 1 文ずつ TextToSpeech に渡して読み上げる。
  * 1 文ずつにしているので、一時停止→再開、前後の文への移動、速度変更の即時反映ができる。
  */
-class Speaker(context: Context) {
+class Speaker private constructor(context: Context) {
     private val app = context.applicationContext
     private var tts: TextToSpeech? = null
     @Volatile private var ready = false
@@ -63,6 +66,12 @@ class Speaker(context: Context) {
             if (status == TextToSpeech.SUCCESS) {
                 ready = true
                 tts?.language = Locale.JAPANESE
+                tts?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build(),
+                )
                 tts?.setOnUtteranceProgressListener(listener)
                 if (_state.value.playing) speakCurrent()
             } else {
@@ -72,15 +81,23 @@ class Speaker(context: Context) {
     }
 
     /** 読み上げる文を設定して start 番目から再生する。 */
-    fun load(newItems: List<SpeechItem>, start: Int, rate: Float) {
+    fun load(newItems: List<SpeechItem>, start: Int, rate: Float, title: String) {
         halt()
         items = newItems
         ended = false
         if (newItems.isEmpty()) { _state.value = PlayerState(rate = rate); return }
         val i = start.coerceIn(0, newItems.lastIndex)
-        _state.value = PlayerState(active = true, playing = false, index = i, total = newItems.size, block = newItems[i].block, rate = rate)
+        _state.value = PlayerState(
+            active = true, playing = false, index = i, total = newItems.size,
+            block = newItems[i].block, rate = rate, title = title,
+        )
+        // 画面を消しても止まらないよう、通知付きのサービスとして動かす
+        runCatching { app.startForegroundService(Intent(app, ReaderService::class.java)) }
         play()
     }
+
+    /** いま読んでいる文（通知に表示）。 */
+    fun currentText(): String = items.getOrNull(_state.value.index)?.text.orEmpty()
 
     fun play() {
         if (items.isEmpty()) return
@@ -154,5 +171,13 @@ class Speaker(context: Context) {
         t.setSpeechRate(s.rate)
         val g = ++gen
         t.speak(item.text, TextToSpeech.QUEUE_FLUSH, null, "$g:${s.index}")
+    }
+
+    companion object {
+        @Volatile private var instance: Speaker? = null
+
+        /** アプリ全体で 1 つ（画面とサービスで共有）。 */
+        fun get(context: Context): Speaker =
+            instance ?: synchronized(this) { instance ?: Speaker(context.applicationContext).also { instance = it } }
     }
 }
