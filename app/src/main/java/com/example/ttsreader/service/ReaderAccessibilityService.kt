@@ -2,6 +2,8 @@ package com.example.ttsreader.service
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -33,6 +35,7 @@ class ReaderAccessibilityService :
     ReadingController.Listener {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var prefs: ReaderPreferences
     private lateinit var tts: TtsEngine
     private lateinit var controller: ReadingController
@@ -49,7 +52,12 @@ class ReaderAccessibilityService :
         overlay = FloatingOverlay(
             context = this,
             prefs = prefs,
-            onToggle = { toggleReading() },
+            callbacks = object : FloatingOverlay.Callbacks {
+                override fun onPlayPause() = togglePlayPause()
+                override fun onStop() = stopReading()
+                override fun onAdjustRate(delta: Float) = prefs.adjustSpeechRate(delta)
+                override fun onClose() = hideOverlayByUser()
+            },
         )
 
         ReaderStateHolder.setServiceConnected(true)
@@ -58,6 +66,7 @@ class ReaderAccessibilityService :
         scope.launch { prefs.speechRate.collect { tts.setSpeechRate(it) } }
         scope.launch { prefs.pitch.collect { tts.setPitch(it) } }
         scope.launch { prefs.overlayEnabled.collect { updateOverlayVisibility() } }
+        scope.launch { prefs.autoLanguage.collect { controller.autoLanguage = it } }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -93,17 +102,42 @@ class ReaderAccessibilityService :
 
     // ---- 外部（Activity / オーバーレイ）から呼ぶ操作 ----
 
+    /** 停止中なら開始、再生中なら停止。 */
     fun toggleReading() {
-        if (!::controller.isInitialized) return
-        if (!tts.isReady) {
-            Toast.makeText(this, R.string.toast_tts_not_ready, Toast.LENGTH_SHORT).show()
-            return
-        }
+        if (!ensureTtsReady()) return
         controller.toggle()
+    }
+
+    /** 停止中なら開始、再生中なら一時停止、一時停止中なら再開。 */
+    fun togglePlayPause() {
+        if (!ensureTtsReady()) return
+        controller.togglePlayPause()
     }
 
     fun stopReading() {
         if (::controller.isInitialized) controller.stop()
+    }
+
+    /**
+     * フローティングコントローラーの × ボタン。読み上げを止めてコントローラーを閉じる。
+     * ボタンのクリック処理の最中に View を外すのを避けるため、1 フレーム遅らせる。
+     * 再表示はアプリ画面のスイッチから行う。
+     */
+    fun hideOverlayByUser() {
+        mainHandler.post {
+            stopReading()
+            prefs.setOverlayEnabled(false)
+            Toast.makeText(this, R.string.toast_overlay_hidden, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun ensureTtsReady(): Boolean {
+        if (!::controller.isInitialized) return false
+        if (!tts.isReady) {
+            Toast.makeText(this, R.string.toast_tts_not_ready, Toast.LENGTH_SHORT).show()
+            return false
+        }
+        return true
     }
 
     /** 設定画面の「テスト再生」。読み上げ中は無視する。 */
@@ -139,8 +173,8 @@ class ReaderAccessibilityService :
 
     // ---- TtsEngine.Callbacks ----
 
-    override fun onTtsReady() {
-        ReaderStateHolder.setTtsStatus(TtsStatus.Ready)
+    override fun onTtsReady(englishAvailable: Boolean) {
+        ReaderStateHolder.setTtsStatus(TtsStatus.Ready(englishAvailable))
     }
 
     override fun onTtsInitFailed(message: String) {

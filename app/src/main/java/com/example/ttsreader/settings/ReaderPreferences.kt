@@ -24,6 +24,23 @@ class ReaderPreferences private constructor(context: Context) {
     private val _overlayEnabled = MutableStateFlow(prefs.getBoolean(KEY_OVERLAY_ENABLED, true))
     val overlayEnabled: StateFlow<Boolean> = _overlayEnabled.asStateFlow()
 
+    private val _autoLanguage = MutableStateFlow(prefs.getBoolean(KEY_AUTO_LANGUAGE, true))
+
+    /** 英語の文を英語音声で読むか（false なら常に日本語音声） */
+    val autoLanguage: StateFlow<Boolean> = _autoLanguage.asStateFlow()
+
+    fun setAutoLanguage(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_LANGUAGE, enabled).apply()
+        _autoLanguage.value = enabled
+    }
+
+    /** 速度を [delta] だけ増減する（0.1 刻みに丸める）。 */
+    fun adjustSpeechRate(delta: Float) {
+        val raw = _speechRate.value + delta
+        val rounded = Math.round(raw * 10f) / 10f
+        setSpeechRate(rounded)
+    }
+
     fun setSpeechRate(rate: Float) {
         val value = rate.coerceIn(MIN_SPEECH_RATE, MAX_SPEECH_RATE)
         prefs.edit().putFloat(KEY_SPEECH_RATE, value).apply()
@@ -60,6 +77,7 @@ class ReaderPreferences private constructor(context: Context) {
         private const val KEY_SPEECH_RATE = "speech_rate"
         private const val KEY_PITCH = "pitch"
         private const val KEY_OVERLAY_ENABLED = "overlay_enabled"
+        private const val KEY_AUTO_LANGUAGE = "auto_language"
         private const val KEY_OVERLAY_X = "overlay_x"
         private const val KEY_OVERLAY_Y = "overlay_y"
         private const val DEFAULT_OVERLAY_X = 24

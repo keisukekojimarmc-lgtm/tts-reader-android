@@ -26,27 +26,38 @@
     <string name="home_service_disconnected">ユーザー補助サービス: 未接続</string>
     <string name="home_state_idle">読み上げ: 停止中</string>
     <string name="home_state_reading">読み上げ: 再生中</string>
+    <string name="home_state_paused">読み上げ: 一時停止中</string>
     <string name="home_tts_initializing">音声エンジン: 準備中…</string>
     <string name="home_tts_ready">音声エンジン: 準備完了</string>
+    <string name="home_tts_ready_no_english">音声エンジン: 準備完了（英語音声なし。英語も日本語音声で読みます）</string>
     <string name="home_tts_error">音声エンジン: %1$s</string>
     <string name="home_speech_rate">読み上げ速度: %1$.1fx</string>
     <string name="home_pitch">声の高さ: %1$.1f</string>
-    <string name="home_overlay_switch">フローティングボタンを表示する</string>
+    <string name="home_overlay_switch">フローティングコントローラーを表示する</string>
+    <string name="home_auto_language_switch">英語の文章は英語音声で読み上げる</string>
     <string name="home_test_speak">テスト再生</string>
     <string name="home_test_sentence">これは読み上げ速度のテストです。設定した速度で読み上げています。</string>
     <string name="home_howto_title">使い方</string>
-    <string name="home_howto_body">1. 読み上げたい文章が表示されているアプリを開きます。\n2. 画面上のフローティングボタン（▶）をタップすると、表示中の文章から読み上げを開始します。\n3. 画面下部まで読み終えると自動でスクロールし、新しく表示された文章を続けて読み上げます。\n4. 停止するにはフローティングボタン（■）をもう一度タップします。</string>
+    <string name="home_howto_body">1. 読み上げたい文章が表示されているアプリを開きます。\n2. 画面上のフローティングコントローラーの ▶ をタップすると、表示中の文章から読み上げを開始します。\n3. 画面下部まで読み終えると自動でスクロールし、新しく表示された文章を続けて読み上げます。\n4. ▶/❚❚ で一時停止と再開、■ で停止、−/＋ で速度を変更できます。\n5. × でコントローラーを閉じられます。再表示は下のスイッチから行えます。</string>
     <string name="home_permissions_title">権限</string>
     <string name="home_reopen_setup">権限の設定をやり直す</string>
 
     <!-- オーバーレイ -->
     <string name="overlay_play">読み上げを開始</string>
+    <string name="overlay_pause">一時停止</string>
+    <string name="overlay_resume">再開</string>
     <string name="overlay_stop">読み上げを停止</string>
+    <string name="overlay_slower">遅くする</string>
+    <string name="overlay_faster">速くする</string>
+    <string name="overlay_close">コントローラーを閉じる</string>
+    <string name="overlay_collapse">折りたたむ</string>
+    <string name="overlay_expand">展開する</string>
 
     <!-- 通知・トースト -->
     <string name="toast_tts_not_ready">音声エンジンを準備中です。少し待ってからもう一度お試しください。</string>
     <string name="toast_no_text">読み上げるテキストが見つかりません。</string>
     <string name="toast_service_not_connected">ユーザー補助サービスが有効になっていません。</string>
+    <string name="toast_overlay_hidden">コントローラーを閉じました。再表示は TTS Reader アプリのスイッチから行えます。</string>
     <string name="tts_error_missing_data">日本語の音声データがインストールされていません</string>
     <string name="tts_error_not_supported">この音声エンジンは日本語に対応していません</string>
     <string name="tts_error_init_failed">音声エンジンの初期化に失敗しました</string>

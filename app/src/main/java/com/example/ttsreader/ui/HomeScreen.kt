@@ -50,6 +50,7 @@ fun HomeScreen(
     val speechRate by prefs.speechRate.collectAsStateWithLifecycle()
     val pitch by prefs.pitch.collectAsStateWithLifecycle()
     val overlayEnabled by prefs.overlayEnabled.collectAsStateWithLifecycle()
+    val autoLanguage by prefs.autoLanguage.collectAsStateWithLifecycle()
     val readerState by ReaderStateHolder.state.collectAsStateWithLifecycle()
     val serviceConnected by ReaderStateHolder.serviceConnected.collectAsStateWithLifecycle()
     val ttsStatus by ReaderStateHolder.ttsStatus.collectAsStateWithLifecycle()
@@ -103,8 +104,22 @@ fun HomeScreen(
                 Text(
                     text = stringResource(R.string.home_overlay_switch),
                     style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
                 )
                 Switch(checked = overlayEnabled, onCheckedChange = prefs::setOverlayEnabled)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_auto_language_switch),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = autoLanguage, onCheckedChange = prefs::setAutoLanguage)
             }
 
             SectionTitle(stringResource(R.string.home_howto_title))
@@ -161,12 +176,18 @@ private fun StatusCard(
             )
             Text(
                 stringResource(
-                    if (readerState == ReaderState.READING) R.string.home_state_reading else R.string.home_state_idle,
+                    when (readerState) {
+                        ReaderState.READING -> R.string.home_state_reading
+                        ReaderState.PAUSED -> R.string.home_state_paused
+                        ReaderState.IDLE -> R.string.home_state_idle
+                    },
                 ),
             )
             val ttsText = when (ttsStatus) {
                 TtsStatus.Initializing -> stringResource(R.string.home_tts_initializing)
-                TtsStatus.Ready -> stringResource(R.string.home_tts_ready)
+                is TtsStatus.Ready -> stringResource(
+                    if (ttsStatus.englishAvailable) R.string.home_tts_ready else R.string.home_tts_ready_no_english,
+                )
                 is TtsStatus.Error -> stringResource(R.string.home_tts_error, ttsStatus.message)
             }
             Text(

@@ -4,11 +4,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ReaderState { IDLE, READING }
+enum class ReaderState { IDLE, READING, PAUSED }
 
 sealed interface TtsStatus {
     data object Initializing : TtsStatus
-    data object Ready : TtsStatus
+
+    /** @param englishAvailable 端末に英語音声があるか（無ければ英語の文も日本語音声で読む） */
+    data class Ready(val englishAvailable: Boolean) : TtsStatus
+
     data class Error(val message: String) : TtsStatus
 }
 

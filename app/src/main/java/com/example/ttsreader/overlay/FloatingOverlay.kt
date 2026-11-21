@@ -18,14 +18,21 @@ import com.example.ttsreader.ui.theme.TtsReaderTheme
 import kotlin.math.roundToInt
 
 /**
- * SYSTEM_ALERT_WINDOW（TYPE_APPLICATION_OVERLAY）で表示するフローティングの再生/停止ボタン。
+ * SYSTEM_ALERT_WINDOW（TYPE_APPLICATION_OVERLAY）で表示するフローティングコントローラー。
  * Compose で描画し、ドラッグで位置を変えられる。
  */
 class FloatingOverlay(
     private val context: Context,
     private val prefs: ReaderPreferences,
-    private val onToggle: () -> Unit,
+    private val callbacks: Callbacks,
 ) {
+    interface Callbacks {
+        fun onPlayPause()
+        fun onStop()
+        fun onAdjustRate(delta: Float)
+        fun onClose()
+    }
+
     private val windowManager: WindowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
@@ -64,12 +71,22 @@ class FloatingOverlay(
             setContent {
                 TtsReaderTheme {
                     val state by ReaderStateHolder.state.collectAsStateWithLifecycle()
-                    FloatingButton(
+                    val speechRate by prefs.speechRate.collectAsStateWithLifecycle()
+                    FloatingController(
                         state = state,
-                        onClick = onToggle,
+                        speechRate = speechRate,
+                        onPlayPause = callbacks::onPlayPause,
+                        onStop = callbacks::onStop,
+                        onAdjustRate = callbacks::onAdjustRate,
+                        onClose = callbacks::onClose,
                         onDrag = { dx, dy -> moveBy(dx, dy) },
                     )
                 }
+            }
+            // 展開/折りたたみでサイズが変わった時に画面外へはみ出さないよう位置を補正する
+            addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                val sizeChanged = (right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)
+                if (sizeChanged) post { moveBy(0f, 0f) }
             }
         }
 

@@ -16,6 +16,9 @@ import com.example.ttsreader.tts.TtsEngine
  *  3. スクロール完了（TYPE_VIEW_SCROLLED または タイムアウト）後に再取得し、履歴に無いテキストだけ追加
  *  4. キューが空になった時点で未スクロールなら再度スクロール。スクロールできない／新規テキストが
  *     続けて見つからない場合は終了を告げて停止
+ *
+ * 一時停止: TextToSpeech に pause が無いため、発話を止めて現在の発話をキュー先頭に戻し、
+ * 再開時にその発話の先頭から読み直す。
  */
 class ReadingController(
     private val screen: ScreenAccess,
@@ -29,7 +32,12 @@ class ReadingController(
         fun finishedAnnouncement(): String
     }
 
-    private class Utterance(val id: String, val text: String, val segment: TextSegment)
+    private class Utterance(
+        val id: String,
+        val text: String,
+        val language: SpeechLanguage,
+        val segment: TextSegment,
+    )
 
     private val handler = Handler(Looper.getMainLooper())
     private val extractor = ScreenTextExtractor()
@@ -37,6 +45,7 @@ class ReadingController(
     private val queue = ArrayDeque<Utterance>()
 
     private var active = false
+    private var paused = false
     private var current: Utterance? = null
     private var pageIndex = 0
     private var utteranceCounter = 0
@@ -49,10 +58,32 @@ class ReadingController(
 
     private val settleRunnable = Runnable { onScrollSettled() }
 
-    val isActive: Boolean get() = active
+    /** 英語の文を英語音声で読むか。false なら全て日本語音声。 */
+    @Volatile
+    var autoLanguage: Boolean = true
 
+    val isActive: Boolean get() = active
+    val isPaused: Boolean get() = active && paused
+
+    val state: ReaderState
+        get() = when {
+            !active -> ReaderState.IDLE
+            paused -> ReaderState.PAUSED
+            else -> ReaderState.READING
+        }
+
+    /** 停止中なら開始、再生中なら停止。 */
     fun toggle() {
         if (active) stop() else start()
+    }
+
+    /** 停止中なら開始、再生中なら一時停止、一時停止中なら再開。 */
+    fun togglePlayPause() {
+        when {
+            !active -> start()
+            paused -> resume()
+            else -> pause()
+        }
     }
 
     fun start() {
@@ -74,9 +105,27 @@ class ReadingController(
         }
     }
 
+    fun pause() {
+        if (!active || paused || announcingEnd) return
+        paused = true
+        val speaking = current
+        current = null
+        if (speaking != null) queue.addFirst(speaking)
+        tts.stop()
+        listener.onStateChanged(ReaderState.PAUSED)
+    }
+
+    fun resume() {
+        if (!active || !paused) return
+        paused = false
+        listener.onStateChanged(ReaderState.READING)
+        speakNext()
+    }
+
     fun stop() {
         if (!active) return
         active = false
+        paused = false
         handler.removeCallbacks(settleRunnable)
         tts.stop()
         queue.clear()
@@ -117,6 +166,7 @@ class ReadingController(
         history.clear()
         queue.clear()
         current = null
+        paused = false
         pageIndex = 0
         scrollPending = false
         emptyScrollStreak = 0
@@ -136,8 +186,9 @@ class ReadingController(
         for (segment in segments) {
             val key = TextNormalizer.normalize(segment.text)
             if (!history.add(key)) continue
-            for (chunk in TextChunker.chunk(segment.text, tts.maxInputLength)) {
-                queue.addLast(Utterance(nextUtteranceId(), chunk, segment))
+            for (chunk in TextChunker.chunkWithLanguage(segment.text, tts.maxInputLength)) {
+                val language = if (autoLanguage) chunk.language else SpeechLanguage.JAPANESE
+                queue.addLast(Utterance(nextUtteranceId(), chunk.text, language, segment))
                 added++
             }
         }
@@ -148,7 +199,7 @@ class ReadingController(
     private fun nextUtteranceId(): String = "u-${++utteranceCounter}"
 
     private fun speakNext() {
-        if (!active || current != null || announcingEnd) return
+        if (!active || paused || current != null || announcingEnd) return
         val next = queue.removeFirstOrNull()
         if (next == null) {
             when {
@@ -159,7 +210,7 @@ class ReadingController(
             return
         }
         current = next
-        if (!tts.speak(next.text, next.id)) {
+        if (!tts.speak(next.text, next.id, next.language)) {
             // 発話に失敗したら飛ばして次へ
             current = null
             handler.post { speakNext() }
@@ -180,7 +231,7 @@ class ReadingController(
     }
 
     private fun requestScroll() {
-        if (!active || scrollPending || endReached) return
+        if (!active || paused || scrollPending || endReached) return
         val scrolled = ScrollHelper.scrollForward(screen.rootNode(), screen.screenRect())
         Log.d(TAG, "requestScroll -> $scrolled")
         if (!scrolled) {
@@ -212,7 +263,7 @@ class ReadingController(
         emptyScrollStreak++
         if (emptyScrollStreak >= MAX_EMPTY_SCROLLS) {
             onEndReached()
-        } else if (current == null) {
+        } else if (current == null && !paused) {
             // 何も話していないなら、続けてもう一度スクロールして探す
             requestScroll()
         }
@@ -223,7 +274,7 @@ class ReadingController(
         endReached = true
         scrollPending = false
         handler.removeCallbacks(settleRunnable)
-        if (current == null && queue.isEmpty()) {
+        if (current == null && queue.isEmpty() && !paused) {
             announceEndAndFinish()
         }
         // まだ話す内容が残っていれば、それを話し切ってから speakNext() 経由で終了する
@@ -238,13 +289,14 @@ class ReadingController(
             return
         }
         announcingEnd = true
-        if (!tts.speak(listener.finishedAnnouncement(), END_UTTERANCE_ID)) {
+        if (!tts.speak(listener.finishedAnnouncement(), END_UTTERANCE_ID, SpeechLanguage.JAPANESE)) {
             finish()
         }
     }
 
     private fun finish() {
         active = false
+        paused = false
         announcingEnd = false
         handler.removeCallbacks(settleRunnable)
         queue.clear()
