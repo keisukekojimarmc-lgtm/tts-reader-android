@@ -11,6 +11,7 @@ import com.example.minutesreader.dropbox.DropboxClient
 import com.example.minutesreader.dropbox.DropboxException
 import com.example.minutesreader.render.MinutesRenderer
 import com.example.minutesreader.render.RenderedDoc
+import com.example.minutesreader.tts.SpeechText
 import com.example.minutesreader.tts.Speaker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -76,7 +77,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back() {
         if (_stack.value.size > 1) {
-            if (_stack.value.last() is Screen.Viewer) speaker.stop()
+            if (_stack.value.last() is Screen.Viewer) speaker.close()
             _stack.value = _stack.value.dropLast(1)
         }
     }
@@ -104,7 +105,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
-        speaker.stop()
+        speaker.close()
         auth.clearTokens()
         repo.clear()
         _stack.value = listOf(Screen.Setup)
@@ -159,8 +160,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun toggleSpeech(doc: RenderedDoc) {
-        if (speaker.speaking.value) speaker.stop() else speaker.speak(doc.speech, prefs.speechRate.value)
+    // ---- 読み上げ ----
+
+    /** 本文の段落リストを受け取り、firstBlock 番目の段落から読み上げを始める。 */
+    fun startReading(blocks: kotlin.collections.List<String>, firstBlock: Int) {
+        val items = SpeechText.items(blocks)
+        val start = items.indexOfFirst { it.block >= firstBlock }.coerceAtLeast(0)
+        speaker.load(items, start, prefs.speechRate.value)
+    }
+
+    /** 本文の段落がタップされたとき（読み上げ中ならそこへ移動）。 */
+    fun onBlockTapped(block: Int) {
+        if (speaker.state.value.active) speaker.seekBlock(block)
+    }
+
+    fun changeRate(rate: Float) {
+        val r = (Math.round(rate.coerceIn(0.5f, 3.0f) * 10) / 10f)
+        prefs.setRate(r)
+        speaker.setRate(r)
     }
 
     override fun onCleared() {

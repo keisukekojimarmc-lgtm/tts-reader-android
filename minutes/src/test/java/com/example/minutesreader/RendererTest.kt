@@ -44,15 +44,18 @@ notion: https://example.com/p
         assertEquals(listOf(2, 2, 3), doc.toc.map { it.level })
     }
 
-    @Test fun speechRemovesTimestamps() {
-        val chunks = SpeechText.chunks("### 1. 論点 [00:00〜06:00]\n\n本文。")
-        assertEquals(listOf("1. 論点", "本文。"), chunks)
+    @Test fun sentencesRemoveTimestampsAndSplit() {
+        assertEquals(listOf("1. 論点"), SpeechText.sentences("1. 論点 [00:00〜06:00]"))
+        assertEquals(listOf("一文目。", "二文目？", "三文目"), SpeechText.sentences("一文目。二文目？三文目"))
     }
 
-    @Test fun speechSplitsLongLines() {
-        val long = "あ".repeat(30) + "。" + "い".repeat(30) + "。"
-        val chunks = SpeechText.chunks(long, max = 40)
-        assertEquals(2, chunks.size)
-        assertTrue(chunks.all { it.length <= 40 })
+    @Test fun sentencesSplitLongText() {
+        val chunks = SpeechText.sentences("あ".repeat(50), max = 40)
+        assertEquals(listOf(40, 10), chunks.map { it.length })
+    }
+
+    @Test fun itemsKeepBlockIndex() {
+        val items = SpeechText.items(listOf("見出し", "", "A。B。"))
+        assertEquals(listOf("見出し" to 0, "A。" to 2, "B。" to 2), items.map { it.text to it.block })
     }
 }

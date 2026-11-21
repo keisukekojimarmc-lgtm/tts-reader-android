@@ -14,7 +14,10 @@ Obsidian の有料同期は不要で、Dropbox から直接読み込みます（
   - （要確認）を蛍光ペン風に強調、`[00:00〜06:00]` のタイムスタンプは小さく表示
   - ダークモード対応、文字サイズ 80〜200%
 - **目次**: 見出し（##, ###）へジャンプ
-- **読み上げ**: 日本語 TTS で本文を読み上げ（速さ調整可）
+- **読み上げ**: 🎧 ボタンで、画面に見えている段落から日本語で読み上げ
+  - 画面下の操作パネルで 一時停止／再開、前の文・次の文、速さ（0.5〜3.0倍、読み上げ中も即反映）、シークバーで好きな位置へ移動
+  - 読んでいる段落を色付けし、自動でスクロール
+  - 読み上げ中に段落をタップすると、そこから読み直し
 - **オフライン**: 一度同期した議事録は端末に保存され、電波がなくても読める。更新時は変わったファイルだけ取得
 
 ## インストール
@@ -51,5 +54,5 @@ minutes/src/main/java/com/example/minutesreader/
 ├── data/     MinutesRepository.kt（キャッシュ・差分同期・検索）, MinuteParser.kt（ファイル名/フロントマター/概要）, Prefs.kt
 ├── render/   MinutesRenderer.kt（Markdown → スマホ向け HTML/CSS）
 ├── tts/      Speaker.kt, SpeechText.kt
-└── ui/       SetupScreen / ListScreen / ViewerScreen / SettingsScreen
+└── ui/       SetupScreen / ListScreen / ViewerScreen / PlayerBar / SettingsScreen
 ```

@@ -75,12 +75,12 @@ fun SettingsScreen(vm: AppViewModel) {
                 )
                 Text("${zoom}%", style = MaterialTheme.typography.labelMedium)
             }
-            Section("読み上げの速さ") {
+            Section("読み上げの速さ（読み上げ中の画面でも変更できます）") {
                 Slider(
                     value = rate,
-                    onValueChange = { vm.prefs.setRate((it * 10).roundToInt() / 10f) },
-                    valueRange = 0.5f..2.0f,
-                    steps = 14,
+                    onValueChange = { vm.changeRate(it) },
+                    valueRange = 0.5f..3.0f,
+                    steps = 24,
                 )
                 Text("${"%.1f".format(rate)}倍", style = MaterialTheme.typography.labelMedium)
             }

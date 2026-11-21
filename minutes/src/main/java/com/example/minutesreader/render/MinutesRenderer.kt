@@ -12,11 +12,10 @@ import org.commonmark.node.Node
 import org.commonmark.node.Text
 import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
-import org.commonmark.renderer.text.TextContentRenderer
 
 data class TocItem(val level: Int, val text: String)
 
-data class RenderedDoc(val html: String, val toc: List<TocItem>, val speech: String)
+data class RenderedDoc(val html: String, val toc: List<TocItem>)
 
 /**
  * 議事録 Markdown をスマホで読みやすい HTML に変換する。
@@ -34,7 +33,6 @@ object MinutesRenderer {
     )
     private val parser: Parser = Parser.builder().extensions(EXT).build()
     private val html: HtmlRenderer = HtmlRenderer.builder().extensions(EXT).escapeHtml(true).sanitizeUrls(true).build()
-    private val text: TextContentRenderer = TextContentRenderer.builder().extensions(EXT).build()
 
     /** ヘッダーカードの本文側に出す項目と、その表示名。 */
     private val DETAIL_LABELS = linkedMapOf(
@@ -83,17 +81,12 @@ object MinutesRenderer {
         }
         val hasHeader = f.isNotEmpty()
 
-        val speech = buildString {
-            append(title).append("。\n")
-            append(text.render(doc))
-        }
-
         val page = """<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>$CSS</style></head>
 <body class="${if (dark) "dark" else ""}">${if (hasHeader) header else ""}<article>${html.render(doc)}</article>
 <script>$JS</script></body></html>"""
-        return RenderedDoc(page, toc, speech)
+        return RenderedDoc(page, toc)
     }
 
     private fun plain(node: Node): String {
@@ -122,8 +115,8 @@ object MinutesRenderer {
     }
 
     private val CSS = """
-:root{--bg:#fbfaf7;--fg:#1f2328;--muted:#5f6670;--line:#e4e1da;--accent:#2f6f9f;--card:#fff;--soft:#f3f1ec;--mark:#fff0b3;--markfg:#5c4500;--code:#efede7}
-body.dark{--bg:#15171a;--fg:#e7e7e4;--muted:#a0a6ad;--line:#30343a;--accent:#86b9e3;--card:#1e2125;--soft:#23272c;--mark:#4d3f0f;--markfg:#ffe08a;--code:#262a30}
+:root{--hl:#dcebfa;--bg:#fbfaf7;--fg:#1f2328;--muted:#5f6670;--line:#e4e1da;--accent:#2f6f9f;--card:#fff;--soft:#f3f1ec;--mark:#fff0b3;--markfg:#5c4500;--code:#efede7}
+body.dark{--hl:#1d3550;--bg:#15171a;--fg:#e7e7e4;--muted:#a0a6ad;--line:#30343a;--accent:#86b9e3;--card:#1e2125;--soft:#23272c;--mark:#4d3f0f;--markfg:#ffe08a;--code:#262a30}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;padding:14px 16px 120px;background:var(--bg);color:var(--fg);font-family:"Noto Sans JP","Noto Sans CJK JP",system-ui,sans-serif;font-size:17px;line-height:1.85;overflow-wrap:anywhere;-webkit-tap-highlight-color:transparent}
 .meta{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:2px 0 18px;font-size:15px;line-height:1.6}
@@ -164,6 +157,8 @@ hr{border:none;border-top:1px solid var(--line);margin:26px 0}
 mark.chk{background:var(--mark);color:var(--markfg);border-radius:4px;padding:0 3px}
 .ts{font-size:.72em;color:var(--muted);font-weight:400;white-space:nowrap}
 li input[type=checkbox]{transform:scale(1.15);margin:0 6px 0 0}
+[data-b]{transition:background-color .25s}
+.speaking{background:var(--hl)!important;border-radius:6px;box-shadow:0 0 0 4px var(--hl)}
 """
 
     private val JS = """
@@ -186,6 +181,21 @@ while((m=re.exec(s))){if(m[1]&&inH)continue;
 if(m.index>last)f.appendChild(document.createTextNode(s.slice(last,m.index)));
 var el=document.createElement(m[1]?'mark':'span');el.className=m[1]?'chk':'ts';el.textContent=m[0];f.appendChild(el);last=re.lastIndex;}
 if(last<s.length)f.appendChild(document.createTextNode(s.slice(last)));p.replaceChild(f,n);});
+var B=[];
+function sp(t){return t.replace(/\s+/g,' ').trim();}
+function own(el){var c=el.cloneNode(true);[].forEach.call(c.querySelectorAll('ul,ol'),function(x){x.parentNode.removeChild(x)});return sp(c.textContent);}
+[].forEach.call(document.querySelectorAll('h1,article h2,article h3,article h4,article p,article li,article tbody tr,article pre'),function(el){
+if(el.tagName==='LI'&&el.querySelector('p'))return;
+var t;if(el.tagName==='TR')t=[].map.call(el.children,function(td){return sp(td.textContent)}).filter(Boolean).join('、');
+else if(el.tagName==='LI')t=own(el);else t=sp(el.textContent);
+if(!t)return;el.setAttribute('data-b',B.length);B.push(t);});
+window.rdBlocks=function(){return B;};
+window.rdFirstVisible=function(){var es=document.querySelectorAll('[data-b]');for(var k=0;k<es.length;k++){if(es[k].getBoundingClientRect().bottom>8)return +es[k].getAttribute('data-b');}return 0;};
+window.rdHl=function(i){var o=document.querySelector('.speaking');if(o)o.classList.remove('speaking');if(i<0)return;
+var e=document.querySelector('[data-b="'+i+'"]');if(!e)return;e.classList.add('speaking');var r=e.getBoundingClientRect();
+if(r.top<40||r.bottom>window.innerHeight-40)e.scrollIntoView({behavior:'smooth',block:'center'});};
+document.addEventListener('click',function(ev){if(ev.target.closest('a,summary,input'))return;var e=ev.target.closest('[data-b]');
+if(e&&window.Reader)Reader.tap(+e.getAttribute('data-b'));});
 })();
 """
 }

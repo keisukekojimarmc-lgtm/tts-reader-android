@@ -3,6 +3,7 @@ package com.example.minutesreader.ui
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -20,8 +21,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,8 +51,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.minutesreader.AppViewModel
 import com.example.minutesreader.DocState
 import com.example.minutesreader.data.MinuteParser
+import org.json.JSONObject
+import org.json.JSONTokener
 
-@SuppressLint("SetJavaScriptEnabled")
+/** 本文の段落タップを JS から受け取る（読み上げ中ならその段落へ移動）。 */
+private class TapBridge(private val onTap: (Int) -> Unit) {
+    @JavascriptInterface
+    fun tap(block: Int) = onTap(block)
+}
+
+@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewerScreen(vm: AppViewModel, id: String) {
@@ -60,7 +68,7 @@ fun ViewerScreen(vm: AppViewModel, id: String) {
     val minute = entries.firstOrNull { it.id == id }
     val dark = isSystemInDarkTheme()
     val zoom by vm.prefs.textZoom.collectAsStateWithLifecycle()
-    val speaking by vm.speaker.speaking.collectAsStateWithLifecycle()
+    val player by vm.speaker.state.collectAsStateWithLifecycle()
     var retry by remember { mutableIntStateOf(0) }
     val state by produceState<DocState>(DocState.Loading, id, dark, retry) {
         value = DocState.Loading
@@ -70,7 +78,12 @@ fun ViewerScreen(vm: AppViewModel, id: String) {
     var showToc by remember { mutableStateOf(false) }
     val bg = MaterialTheme.colorScheme.background.toArgb()
 
-    DisposableEffect(id) { onDispose { vm.speaker.stop() } }
+    DisposableEffect(id) { onDispose { vm.speaker.close() } }
+
+    // 読んでいる段落をハイライトして、画面外ならスクロール
+    LaunchedEffect(player.block, player.active, webView) {
+        webView?.evaluateJavascript("window.rdHl&&rdHl(${if (player.active) player.block else -1});", null)
+    }
 
     Scaffold(
         topBar = {
@@ -94,12 +107,36 @@ fun ViewerScreen(vm: AppViewModel, id: String) {
                         if (s.doc.toc.isNotEmpty()) {
                             IconButton(onClick = { showToc = true }) { Icon(Icons.AutoMirrored.Filled.List, "目次") }
                         }
-                        IconButton(onClick = { vm.toggleSpeech(s.doc) }) {
-                            if (speaking) Icon(Icons.Default.Close, "読み上げを止める") else Icon(Icons.Default.PlayArrow, "読み上げ")
+                        if (!player.active) {
+                            IconButton(onClick = {
+                                // 画面に見えている段落から読み上げを始める
+                                val wv = webView ?: return@IconButton
+                                wv.evaluateJavascript("JSON.stringify({b:rdBlocks(),f:rdFirstVisible()})") { result ->
+                                    runCatching {
+                                        val o = JSONObject(JSONTokener(result).nextValue() as String)
+                                        val arr = o.getJSONArray("b")
+                                        val blocks = (0 until arr.length()).map { arr.getString(it) }
+                                        vm.startReading(blocks, o.optInt("f", 0))
+                                    }
+                                }
+                            }) { Icon(PlayerIcons.Headphones, "読み上げ") }
                         }
                     }
                 },
             )
+        },
+        bottomBar = {
+            if (player.active) {
+                PlayerBar(
+                    st = player,
+                    onToggle = vm.speaker::toggle,
+                    onPrev = vm.speaker::prev,
+                    onNext = vm.speaker::next,
+                    onSeek = vm.speaker::seek,
+                    onRate = vm::changeRate,
+                    onClose = vm.speaker::close,
+                )
+            }
         },
     ) { pad ->
         when (val s = state) {
@@ -131,6 +168,7 @@ fun ViewerScreen(vm: AppViewModel, id: String) {
                                 return true
                             }
                         }
+                        addJavascriptInterface(TapBridge(vm::onBlockTapped), "Reader")
                         webView = this
                     }
                 },
