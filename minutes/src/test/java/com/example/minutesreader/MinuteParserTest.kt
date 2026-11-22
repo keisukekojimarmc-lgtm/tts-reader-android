@@ -96,4 +96,11 @@ HRBP側が、**ヘッドカウント案**を説明した。
             sorted,
         )
     }
+
+    @Test fun orderingAscKeepsUndatedLast() {
+        fun f(name: String) = MinuteParser.build(RemoteFile(name, name, name, "r", ""), null)
+        val sorted = listOf(f("用語リスト.md"), f("2026-11-19_0900_A_y.md"), f("2026-10-01_1000_A_x.md"))
+            .sortedWith(MinuteParser.ORDER_ASC).map { it.name }
+        assertEquals(listOf("2026-10-01_1000_A_x.md", "2026-11-19_0900_A_y.md", "用語リスト.md"), sorted)
+    }
 }

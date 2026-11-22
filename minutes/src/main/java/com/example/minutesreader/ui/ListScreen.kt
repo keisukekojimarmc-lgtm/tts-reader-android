@@ -2,6 +2,13 @@ package com.example.minutesreader.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,6 +81,9 @@ fun ListScreen(vm: AppViewModel) {
     val cat by vm.category.collectAsStateWithLifecycle()
     val cats by vm.categories.collectAsStateWithLifecycle()
     val readKeys by vm.prefs.readKeys.collectAsStateWithLifecycle()
+    val sortAsc by vm.prefs.sortAsc.collectAsStateWithLifecycle()
+    val collapsed by vm.prefs.collapsed.collectAsStateWithLifecycle()
+    var menu by remember { mutableStateOf(false) }
     var searching by rememberSaveable { mutableStateOf(query.isNotEmpty()) }
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
@@ -99,6 +109,15 @@ fun ListScreen(vm: AppViewModel) {
                     actions = {
                         IconButton(onClick = { searching = true }) { Icon(Icons.Default.Search, "検索") }
                         IconButton(onClick = { vm.navigate(Screen.Settings) }) { Icon(Icons.Default.Settings, "設定") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "その他") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (sortAsc) "新しい順にする" else "古い順にする") },
+                                onClick = { menu = false; vm.toggleSort() },
+                            )
+                            DropdownMenuItem(text = { Text("すべての月を折りたたむ") }, onClick = { menu = false; vm.collapseAll() })
+                            DropdownMenuItem(text = { Text("すべての月を開く") }, onClick = { menu = false; vm.expandAll() })
+                        }
                     },
                 )
             }
@@ -117,13 +136,19 @@ fun ListScreen(vm: AppViewModel) {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
-                if (cats.size > 1) {
-                    item(key = "chips") {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            item { FilterChip(selected = cat == null, onClick = { vm.category.value = null }, label = { Text("すべて") }) }
+                item(key = "chips") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item {
+                            AssistChip(
+                                onClick = vm::toggleSort,
+                                label = { Text(if (sortAsc) "↑ 古い順" else "↓ 新しい順") },
+                            )
+                        }
+                        if (cats.size > 1) {
+                            item { FilterChip(selected = cat == null, onClick = { vm.category.value = null }, label = { Text("全区分") }) }
                             items(cats) { c ->
                                 FilterChip(
                                     selected = cat == c,
@@ -137,10 +162,23 @@ fun ListScreen(vm: AppViewModel) {
                 if (items.isEmpty()) {
                     item(key = "empty") { EmptyState(syncing = syncing, noData = all.isEmpty(), query = query) }
                 }
+                // 検索中は折りたたみを無視してすべて表示
+                val searchingNow = query.isNotBlank()
                 items.groupBy(MinuteParser::monthKey).forEach { (month, list) ->
-                    stickyHeader(key = "m_$month") { MonthHeader(month, list.size) }
-                    items(list, key = { it.id }) { m ->
-                        MinuteRow(m, unread = m.readKey !in readKeys, onClick = { vm.open(m) })
+                    val folded = !searchingNow && month in collapsed
+                    stickyHeader(key = "m_$month") {
+                        MonthHeader(
+                            month = month,
+                            count = list.size,
+                            unread = list.count { it.readKey !in readKeys },
+                            folded = folded,
+                            onClick = { vm.toggleMonth(month) },
+                        )
+                    }
+                    if (!folded) {
+                        items(list, key = { it.id }) { m ->
+                            MinuteRow(m, unread = m.readKey !in readKeys, onClick = { vm.open(m) })
+                        }
                     }
                 }
             }
@@ -179,12 +217,39 @@ private fun SearchBarTop(query: String, onQuery: (String) -> Unit, onClose: () -
 }
 
 @Composable
-private fun MonthHeader(month: String, count: Int) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun MonthHeader(month: String, count: Int, unread: Int, folded: Boolean, onClick: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            Modifier.padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = if (folded) "開く" else "折りたたむ",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.rotate(if (folded) -90f else 0f),
+            )
+            Spacer(Modifier.width(4.dp))
             Text(month, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
             Text("${count}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (unread > 0) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "未読 $unread",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 7.dp),
+                )
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.minutesreader.data.Minute
+import com.example.minutesreader.data.MinuteParser
 import com.example.minutesreader.data.MinutesRepository
 import com.example.minutesreader.data.Prefs
 import com.example.minutesreader.dropbox.AuthStore
@@ -63,13 +64,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val visible: StateFlow<kotlin.collections.List<Minute>> =
-        combine(repo.entries, query.debounce(200), category) { list, q, c ->
-            list.filter { (c == null || it.category == c) && repo.matches(it, q) }
+        combine(repo.entries, query.debounce(200), category, prefs.sortAsc) { list, q, c, asc ->
+            val hit = list.filter { (c == null || it.category == c) && repo.matches(it, q) }
+            if (asc) hit.sortedWith(MinuteParser.ORDER_ASC) else hit
         }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Eagerly, repo.entries.value)
 
     init {
         if (auth.isLoggedIn) refresh()
     }
+
+    // ---- 並び順・折りたたみ ----
+
+    fun toggleSort() = prefs.setSortAsc(!prefs.sortAsc.value)
+
+    fun toggleMonth(month: String) {
+        val c = prefs.collapsed.value
+        prefs.setCollapsed(if (month in c) c - month else c + month)
+    }
+
+    fun collapseAll() = prefs.setCollapsed(repo.entries.value.map(MinuteParser::monthKey).toSet())
+
+    fun expandAll() = prefs.setCollapsed(emptySet())
 
     // ---- 画面遷移 ----
 

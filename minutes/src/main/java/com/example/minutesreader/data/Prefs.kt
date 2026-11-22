@@ -20,6 +20,18 @@ class Prefs(context: Context) {
     private val _read = MutableStateFlow(sp.getStringSet(K_READ, emptySet())!!.toSet())
     val readKeys: StateFlow<Set<String>> = _read
 
+    private val _sortAsc = MutableStateFlow(sp.getBoolean(K_SORT_ASC, false))
+    /** true = 古い順 */
+    val sortAsc: StateFlow<Boolean> = _sortAsc
+
+    private val _collapsed = MutableStateFlow(sp.getStringSet(K_COLLAPSED, emptySet())!!.toSet())
+    /** 折りたたんでいる月（「2026年11月」など） */
+    val collapsed: StateFlow<Set<String>> = _collapsed
+
+    fun setSortAsc(v: Boolean) { _sortAsc.value = v; sp.edit().putBoolean(K_SORT_ASC, v).apply() }
+
+    fun setCollapsed(v: Set<String>) { _collapsed.value = v; sp.edit().putStringSet(K_COLLAPSED, v).apply() }
+
     fun setRoot(path: String) {
         val p = normalizeRoot(path)
         _root.value = p
@@ -58,6 +70,8 @@ class Prefs(context: Context) {
         private const val K_RATE = "rate"
         private const val K_READ = "read"
         private const val K_INIT = "read_init"
+        private const val K_SORT_ASC = "sort_asc"
+        private const val K_COLLAPSED = "collapsed"
 
         fun normalizeRoot(path: String): String {
             val t = path.trim().trimEnd('/')

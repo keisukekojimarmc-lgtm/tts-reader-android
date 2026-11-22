@@ -107,6 +107,16 @@ object MinuteParser {
         }
     }
 
+    /** 古い順（日付なしの資料は最後のまま）。 */
+    val ORDER_ASC: Comparator<Minute> = Comparator { a, b ->
+        when {
+            a.date != null && b.date == null -> -1
+            a.date == null && b.date != null -> 1
+            a.date == null -> a.name.compareTo(b.name)
+            else -> -ORDER.compare(a, b)
+        }
+    }
+
     private val WEEK = arrayOf("月", "火", "水", "木", "金", "土", "日")
 
     fun weekday(date: String): String =
